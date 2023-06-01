@@ -17,12 +17,11 @@ Save a figure:
 ```python
 import pltsave
 
-figure_info = pltsave.dumps(fig)
+figure_info = pltsave.dumps(fig).to_json()
 ```
 
 Load the figure
 
 ```python
-fig2 = plt.figure()
-pltsave.load_fig(fig2, figure_info)
+fig = pltsave.loads(fig2)
 ```
