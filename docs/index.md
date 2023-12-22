@@ -1,7 +1,7 @@
 # Pltsave. Super easy way to save and open matplotlib plots.
 
 <h1 align="center">
-<img src="docs/images/pltsave-small.png" height="200">
+<img src="images/pltsave-small.png" height="200">
 </h1>
 <br/>
 
@@ -27,24 +27,16 @@
 
 ## Install
 
-`pip install pltsave`
+See [installation page](starting_guide/install.md) for more information.
+
+```bash
+pip install pltsave
+```
 
 ## Usage
 
-Save a figure:
+See [usage guide](starting_guide/how_to_use.md) for more information.
 
-```python
-import pltsave
+## Example
 
-figure_info = pltsave.dumps(fig).to_json()
-```
-
-Load the figure
-
-```python
-fig = pltsave.loads(figure_info)
-```
-
-## That's it.
-
-It's as easy as it looks. See [the documentation](https://kyrylo-gr.github.io/pltsave/) for more information and examples.
+This library is tested on different examples. See [1d example](examples/1d_test.md) and [2d example](examples/2d_test.md) to get idea what plots can be easily saved.

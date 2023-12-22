@@ -14,30 +14,34 @@ COLORS = ["#0066cc", "#ffcc00", "#ff7400", "#962fbf"]
 
 
 class BaseTest(unittest.TestCase):
+    data_dir = DATA_DIR
+    file_prefix = ""
+
     def setUp(self):
         # if not os.path.exists(DATA_DIR):
         # shutil.rmtree(DATA_DIR)
         os.makedirs(DATA_DIR, exist_ok=True)
+        self.file_prefix = self.__class__.__name__
 
-    def assertConversionRight(self, fig: 'plt.Figure'):
+    def assertConversionRight(self, fig: "plt.Figure"):
         info = pltsave.dumps(fig)
         fig2 = pltsave.loads(info)
         self.assertFigEqual(fig, fig2)
 
-    def assertFigEqual(self, fig1: 'plt.Figure', fig2: 'plt.Figure'):
+    def assertFigEqual(self, fig1: "plt.Figure", fig2: "plt.Figure"):
         self._assertFigEqual(fig1, fig2, True)
 
-    def assertFigNotEqual(self, fig1: 'plt.Figure', fig2: 'plt.Figure'):
+    def assertFigNotEqual(self, fig1: "plt.Figure", fig2: "plt.Figure"):
         self._assertFigEqual(fig1, fig2, False)
 
     def _assertFigEqual(
         self,
-        fig1: 'plt.Figure',
-        fig2: 'plt.Figure',
+        fig1: "plt.Figure",
+        fig2: "plt.Figure",
         assert_to: bool,
     ):
-        path1 = os.path.join(DATA_DIR, f"{self._testMethodName}_fig1.png")
-        path2 = os.path.join(DATA_DIR, f"{self._testMethodName}_fig2.png")
+        path1 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png")
+        path2 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png")
         fig1.savefig(path1)
         fig2.savefig(path2)
 
@@ -58,8 +62,8 @@ class BaseTest(unittest.TestCase):
         self.tearDown()
 
     def tearDown(self):
-        path1 = os.path.join(DATA_DIR, f"{self._testMethodName}_fig1.png")
-        path2 = os.path.join(DATA_DIR, f"{self._testMethodName}_fig2.png")
+        path1 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png")
+        path2 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png")
         if os.path.exists(path1):
             os.remove(path1)
         if os.path.exists(path2):
@@ -67,8 +71,13 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(DATA_DIR) and not os.listdir(DATA_DIR):
-            shutil.rmtree(DATA_DIR)
+        if os.path.exists(cls.data_dir) and not os.listdir(cls.data_dir):
+            shutil.rmtree(cls.data_dir)
+
+    @classmethod
+    def run_all_tests(cls):
+        suite = unittest.TestLoader().loadTestsFromTestCase(cls)
+        unittest.TextTestRunner().run(suite)
 
 
 def create_simple_plot(**kwargs):
@@ -90,5 +99,5 @@ def plot_on_axis(ax: plt.Axes, **kwargs):
 
 def get_data(length: int = 100):
     x = np.linspace(0, 2 * np.pi, length)
-    y = np.sin(x)*np.random.rand(len(x))
+    y = np.sin(x) * np.random.rand(len(x))
     return x, y
