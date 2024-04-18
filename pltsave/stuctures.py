@@ -1,15 +1,67 @@
-from dataclasses import asdict, dataclass
-from typing import List, Literal, Optional
-from matplotlib import axes, lines, collections, axis, text as mtext
-import numpy as np
 import json
+from dataclasses import asdict, dataclass
+from typing import Dict, List, Literal, Optional, Type, Union
+
+import numpy as np
+from matplotlib import axes, axis, collections, figure, image, legend, lines
+from matplotlib import text as mtext
+from matplotlib.artist import Artist
+
 from . import json_coders
+from .aliases import SHORT_NAMES_OF_CLASSES, SHORT_NAMES_OF_CLASSES_INVERSE
+from .compress.routines import decode_dict, encode_dict
+from .defaults import DEFAULT_COLORS, DEFAULT_COLORS_REVERSE, DEFAULT_VALUES
+
+
+def dict_filter_non_none(d: dict, keys: Optional[List[str]] = None) -> dict:
+    ks = keys or d.keys()
+    return {k: d[k] for k in ks if d[k] is not None}
+
+
+def kwargs_filter_non_none(elm, keys):
+    res = {}
+    for key in keys:
+        if hasattr(elm, key):
+            val = getattr(elm, key)
+            if val is not None:
+                res[key] = val
+    return res
+
+
+def kwargs_filter_default(elm, keys):
+    kwargs = {}
+    for key in keys:
+        if key == "color":
+            kwargs["color"] = check_default_color(str(elm.get_color()))
+            continue
+        if key == "label":
+            label = elm.get_label()
+            if label and label[0] != "_":
+                kwargs["label"] = label
+            continue
+
+        value = getattr(elm, f"get_{key}")()
+        if (key not in DEFAULT_VALUES or value != DEFAULT_VALUES[key]) and value is not None:
+            kwargs[key] = value
+
+    return kwargs
+
+
+def check_default_color(color: str):
+    return DEFAULT_COLORS_REVERSE.get(color, color)
+
+
+def get_default_color(color: Union[str, int]):
+    if isinstance(color, int) or (isinstance(color, str) and color.isdigit()):
+        return DEFAULT_COLORS.get(int(color), color)
+    return color
 
 
 @dataclass
 class ArtistInfo:
     _children = None
     _transformation = None
+    _elm = None  # type: ignore
 
     @property
     def children(self) -> List["ArtistInfo"]:
@@ -33,17 +85,27 @@ class ArtistInfo:
         return data
 
     def to_dict(self):
-        d = self.params()
-        d["children"] = [
+        d = dict_filter_non_none(self.params())
+        children = [
             (child.to_dict() if hasattr(child, "to_dict") else child) for child in self.children
         ]
+        if children:
+            d["children"] = children
         if self.transformation:
             d["transformation"] = self.transformation.to_dict()
-        d["__name__"] = self.__class__.__name__
+        d["__name__"] = SHORT_NAMES_OF_CLASSES[self.__class__.__name__]
         return d
 
     def to_json(self):
         return json.dumps(self.to_dict(), sort_keys=True, indent=4, cls=json_coders.StringEncoder)
+
+    def to_compresed_str(self):
+        return encode_dict(self.to_dict())
+
+    def to_url(self, title: Optional[str] = None):
+        if title:
+            return f"[{title}]({self.to_url()})"
+        return f"//papir.app/plot?d={self.to_compresed_str()}"
 
     @classmethod
     def from_json(cls, s):
@@ -51,36 +113,45 @@ class ArtistInfo:
         return cls.from_dict(data)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ArtistInfo":
-        # return data
-        if not isinstance(data, dict):
-            print("!!!!", data)
+    def from_compresed_str(cls, s):
+        data = decode_dict(s)
+        return cls.from_dict(data)
 
-        # print(data)
-        if data.get("__name__") not in NAMES_OF_CLASSES:
-            return data
-        # if 'children' in data:
+    @classmethod
+    def from_dict(cls, data: dict) -> "ArtistInfo":
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict, got {type(data)}")
+
+        class_name = data.pop("__name__")
+        class_name = SHORT_NAMES_OF_CLASSES_INVERSE.get(class_name, class_name)
+
+        if class_name not in NAMES_OF_CLASSES:
+            raise ValueError(f"Unknown class name: {class_name}")
+
         children = [cls.from_dict(child) for child in data.pop("children", [])]
         transformation = data.pop("transformation", None)
 
-        # else:
-        # children = None
+        cls_type = NAMES_OF_CLASSES[class_name]
 
-        cls_name = NAMES_OF_CLASSES[data.pop("__name__")]
-        data = cls_name(**data)
+        obj = cls_type(**data)
         if children:
-            data._children = children  # pylint: disable=W0212
+            obj._children = children  # pylint: disable=W0212
         if transformation:
-            # print(transformation)
-            data.transformation = TransformationInfo.from_dict(transformation)
+            obj.transformation = TransformationInfo.from_dict(transformation)
 
-        return data
+        return obj
 
     def __str__(self) -> str:
-        return str(self.to_dict())
+        return str(self.__class__.__name__)
 
-    def load_to(self, elm):
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def load_to(self, elm, /):
         del elm
+
+    def loads(self, /, **kwargs):
+        raise NotImplementedError
 
 
 @dataclass
@@ -90,31 +161,35 @@ class TransformationInfo(ArtistInfo):
     @staticmethod
     def dumps_from_obj(elm: lines.Line2D):
         if hasattr(elm, "_axes"):
-            if elm.get_transform() is elm._axes.get_xaxis_transform(which="grid"):
+            if elm.get_transform() is elm._axes.get_xaxis_transform(  # pylint: disable=W0212
+                which="grid"
+            ):
                 return TransformationInfo(which="x_grid")
-            if elm.get_transform() is elm._axes.get_yaxis_transform(which="grid"):
+            if elm.get_transform() is elm._axes.get_yaxis_transform(  # pylint: disable=W0212
+                which="grid"
+            ):
                 return TransformationInfo(which="y_grid")
 
-    def load_to(self, elm: lines.Line2D):
+    def load_to(self, elm: Union[lines.Line2D, collections.LineCollection], /):
         if self.which == "x_grid":
-            elm.set_transform(elm._axes.get_xaxis_transform(which="grid"))
+            elm.set_transform(elm._axes.get_xaxis_transform(which="grid"))  # pylint: disable=W0212
         if self.which == "y_grid":
-            elm.set_transform(elm._axes.get_yaxis_transform(which="grid"))
+            elm.set_transform(elm._axes.get_yaxis_transform(which="grid"))  # pylint: disable=W0212
 
 
 @dataclass
 class LineInfo(ArtistInfo):
     xdata: np.ndarray
     ydata: np.ndarray
-    color: str = "black"
-    alpha: int = 1
-    ls: str = "-"
-    lw: int = 1.5
-    ds: str = "default"
-    marker: str = "None"
+    color: Optional[str] = None
+    alpha: Optional[float] = None
+    linestyle: Optional[str] = None
+    linewidth: Optional[float] = None
+    drawstyle: Optional[str] = None
+    marker: Optional[Union[str, int]] = None
     markerfacecolor: Optional[str] = None
     markeredgecolor: Optional[str] = None
-    label: str = ""
+    label: Optional[str] = None
     zorder: Optional[int] = None
 
     _elm = lines.Line2D
@@ -122,25 +197,54 @@ class LineInfo(ArtistInfo):
 
     @staticmethod
     def dumps(elm: lines.Line2D):
+        kwargs = kwargs_filter_default(
+            elm,
+            [
+                "alpha",
+                "linestyle",
+                "linewidth",
+                "drawstyle",
+                "marker",
+                "color",
+                "label",
+            ],
+        )
+        if kwargs.get("marker", "None") != "None":
+            kwargs["markerfacecolor"] = check_default_color(str(elm.get_markerfacecolor()))
+            kwargs["markeredgecolor"] = check_default_color(str(elm.get_markeredgecolor()))
+
         return LineInfo(
-            *elm.get_data(),
-            color=elm.get_color(),
-            alpha=elm.get_alpha(),
-            ls=elm.get_ls(),
-            lw=elm.get_lw(),
-            ds=elm.get_ds(),
-            marker=elm.get_marker(),
-            markerfacecolor=elm.get_markerfacecolor(),
-            markeredgecolor=elm.get_markeredgecolor(),
-            label=elm.get_label(),
+            *elm.get_data(),  # type: ignore
             zorder=elm.get_zorder(),
+            **kwargs,
         )
 
-    def load_to(self, ax: axes.Axes):
-        line = self._elm(**self.params())  # pylint: disable=W0212
-        getattr(ax, self._func)(line)
+    def load_to(self, ax: axes.Axes, /):
+        pass
+        # params = self.params()
+        # if "color" in params:
+        #     params["color"] = get_default_color(params["color"])
+
+        # line = lines.Line2D(**params)  # pylint: disable=W0212
+        # getattr(ax, self._func)(line)
+        # if self.transformation:
+        #     self.transformation.load_to(line)
+
+    def loads(self, /, **kwargs):
+        ax: axes.Axes = kwargs["ax"]
+        params = self.params()
+        if "color" in params:
+            params["color"] = get_default_color(params["color"])
+        if "markeredgecolor" in params:
+            params["markeredgecolor"] = get_default_color(params["markeredgecolor"])
+        if "markerfacecolor" in params:
+            params["markerfacecolor"] = get_default_color(params["markerfacecolor"])
+        line = lines.Line2D(**params)
+        ax.add_line(line)
         if self.transformation:
             self.transformation.load_to(line)
+
+        return line
 
 
 @dataclass
@@ -148,9 +252,9 @@ class LineCollectionInfo(ArtistInfo):
     segments: List[List[float]]
 
     color: Optional[str] = None
-    alpha: Optional[int] = 1
-    ls: Optional[str] = None
-    lw: Optional[int] = None
+    alpha: Optional[int] = None
+    linestyle: Optional[str] = None
+    linewidth: Optional[int] = None
 
     label: Optional[str] = None
     zorder: Optional[int] = None
@@ -160,19 +264,34 @@ class LineCollectionInfo(ArtistInfo):
 
     @staticmethod
     def dumps(elm: collections.LineCollection):
-        return LineCollectionInfo(
-            segments=elm.get_segments(),
-            color=elm.get_color(),
-            alpha=elm.get_alpha(),
-            # ls=elm.get_ls(),
-            # lw=elm.get_lw(),
-            label=elm.get_label(),
-            zorder=elm.get_zorder(),
+        kwargs = kwargs_filter_default(
+            elm,
+            [
+                "color",
+                "alpha",
+                "linestyle",
+                "linewidth",
+                "label",
+                "zorder",
+            ],
         )
 
-    def load_to(self, ax: axes.Axes):
-        line = self._elm(**self.params())  # pylint: disable=W0212
-        getattr(ax, self._func)(line)
+        return LineCollectionInfo(
+            segments=elm.get_segments(),
+            **kwargs,
+        )
+
+    def load_to(self, ax: axes.Axes, /):
+        pass
+
+    def loads(self, /, **kwargs):
+        ax: axes.Axes = kwargs["ax"]
+        params = self.params()
+        if "color" in params:
+            params["color"] = get_default_color(params["color"])
+
+        line = collections.LineCollection(**params)  # pylint: disable=W0212
+        ax.add_collection([line])
         if self.transformation:
             self.transformation.load_to(line)
 
@@ -182,14 +301,17 @@ class AxesInfo(ArtistInfo):
     xlim: tuple = (0, 1)
     ylim: tuple = (0, 1)
     rect: tuple = (0, 0, 1, 1)
-    xlabel: str = None
-    ylabel: str = None
-    title: str = None
-    xticks: list = None
-    yticks: list = None
+    xlabel: Optional[str] = None
+    ylabel: Optional[str] = None
+    title: Optional[str] = None
+    xticks: Optional[list] = None
+    yticks: Optional[list] = None
+
+    _elm = axes.Axes
 
     @staticmethod
-    def dumps(elm: lines.Line2D):
+    def dumps(elm: axes.Axes):
+
         return AxesInfo(
             xlim=elm.get_xlim(),
             ylim=elm.get_ylim(),
@@ -201,25 +323,52 @@ class AxesInfo(ArtistInfo):
             # yticks=elm.get_yticks(),
         )
 
+    def load_to(self, ax: axes.Axes, /):
+        pass
+
+    def loads(self, /, **kwargs):
+        fig: figure.Figure = kwargs["fig"]
+        ax = axes.Axes(fig=fig, **self.params())
+
+        for child in self.children:
+            child.loads(ax=ax, **kwargs)
+        fig.add_axes(ax)
+        return ax
+
 
 @dataclass
 class LegendInfo(ArtistInfo):
     loc: int
 
     @staticmethod
-    def dumps(elm: lines.Line2D):
-        return LegendInfo(loc=elm._get_loc())  # pylint: disable=W0212
+    def dumps(elm: legend.Legend):
+        return LegendInfo(loc=elm._get_loc())  # pylint: disable=W0212 # type: ignore
 
-    def load_to(self, ax: axes.Axes):
+    def load_to(self, ax: axes.Axes, /):
         ax.legend(loc=self.loc)
+
+    def loads(self, /, **kwargs):
+        obj = kwargs.get("ax", kwargs["fig"])
+        obj.legend(loc=self.loc)
 
 
 @dataclass
 class FigureInfo(ArtistInfo):
+    _elm = figure.Figure
+
     @staticmethod
-    def dumps(elm: lines.Line2D):
+    def dumps(elm: figure.Figure):
         del elm
         return FigureInfo()
+
+    def load(self, fig: figure.Figure, /, **kwargs):
+        for child in self.children:
+            child.loads(fig=fig, **kwargs)
+
+    def loads(self, /, **kwargs):
+        fig = figure.Figure()
+        self.load(fig, **kwargs)
+        return fig
 
 
 @dataclass
@@ -231,23 +380,25 @@ class AxisInfo(ArtistInfo):
     labelright: bool = False
     gridOn: bool = False
 
+    _elm = axis.Axis
+
     @classmethod
     def dumps(cls, elm: axis.Axis):
-        return cls(**elm.get_tick_params())
+        return cls(**elm.get_tick_params())  # type: ignore
 
-    def load_to(self, ax: axes.Axes):
+    def load_to(self, ax: axes.Axes, /):
         if self.gridOn:
             ax.grid(axis=self.direction)
 
 
 @dataclass
 class XAxisInfo(AxisInfo):
-    direction: str = "x"
+    direction = "x"
 
 
 @dataclass
 class YAxisInfo(AxisInfo):
-    direction: str = "y"
+    direction = "y"
 
 
 @dataclass
@@ -260,22 +411,51 @@ class AnnotationInfo(ArtistInfo):
 
     @classmethod
     def dumps(cls, elm: mtext.Annotation):
-        text = elm._text  # pylint: disable=W0212
+        text = elm._text  # pylint: disable=W0212 # type: ignore
 
         return cls(
             text=text,
-            xy=elm.xy,
-            xytext=(elm._x, elm._y),  # pylint: disable=W0212
-            xycoords=elm.xycoords,
-            arrowprops=elm.arrowprops,
+            xy=elm.xy,  # type: ignore
+            xytext=(elm._x, elm._y),  # pylint: disable=W0212 # type: ignore
+            xycoords=elm.xycoords,  # type: ignore
+            arrowprops=elm.arrowprops,  # type: ignore
         )
 
-    def load_to(self, ax: axes.Axes):
+    def load_to(self, ax: axes.Axes, /):
         text = mtext.Annotation(**self.params())
-        ax._add_text(text)  # pylint: disable=W0212
+        ax._add_text(text)  # pylint: disable=W0212 # type: ignore
 
 
-NAMES_OF_CLASSES = {
+@dataclass
+class AxesImageInfo(ArtistInfo):
+    data: np.ndarray
+    aspect: float = 1.0
+    extent: Optional[list] = None
+    origin: str = "upper"
+    cmap: Optional[str] = None
+
+    @classmethod
+    def dumps(cls, elm: image.AxesImage):
+        colormap = elm.get_cmap()
+        if colormap is not None:
+            if hasattr(colormap, "name"):
+                colormap = colormap.name  # type: ignore
+            else:
+                colormap = None  # TODO: add support for custom colormaps
+        return cls(
+            data=elm.get_array().data,
+            aspect=elm._axes._aspect,  # pylint: disable=W0212 # type: ignore
+            extent=elm.get_extent(),  # type: ignore
+            origin=elm.origin,  # type: ignore
+            cmap=colormap,
+        )
+
+    def load_to(self, ax: axes.Axes, /):
+        kwargs = kwargs_filter_non_none(self, ["aspect", "extent", "origin", "cmap"])
+        ax.imshow(np.array(self.data), **kwargs)
+
+
+NAMES_OF_CLASSES: Dict[str, Type[ArtistInfo]] = {
     "LineInfo": LineInfo,
     "AxesInfo": AxesInfo,
     "LegendInfo": LegendInfo,
@@ -285,4 +465,5 @@ NAMES_OF_CLASSES = {
     "XAxisInfo": XAxisInfo,
     "YAxisInfo": YAxisInfo,
     "AnnotationInfo": AnnotationInfo,
+    "AxesImageInfo": AxesImageInfo,
 }

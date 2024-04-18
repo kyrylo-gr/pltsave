@@ -1,52 +1,63 @@
-from typing import overload
+import json
+import typing as _t
+from uu import decode
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import collections, image, legend, lines, text
+from matplotlib.artist import Artist
+from matplotlib.figure import Figure
 
+from . import json_coders
+from .aliases import SHORT_NAMES_OF_CLASSES_INVERSE
+from .compress.routines import decode_dict
 from .stuctures import (
-    LineInfo,
+    NAMES_OF_CLASSES,
+    AnnotationInfo,
+    ArtistInfo,
+    AxesImageInfo,
     AxesInfo,
-    LegendInfo,
     FigureInfo,
+    LegendInfo,
     LineCollectionInfo,
+    LineInfo,
     TransformationInfo,
     XAxisInfo,
     YAxisInfo,
-    AnnotationInfo,
 )
 
 
-@overload
-def dumps(elm: "plt.Figure") -> FigureInfo:
-    ...
+@_t.overload
+def dumps(elm: "Figure") -> FigureInfo: ...  # noqa: E704
 
 
-@overload
-def dumps(elm: "plt.Axes") -> AxesInfo:
-    ...
+@_t.overload
+def dumps(elm: "plt.Axes") -> AxesInfo: ...  # noqa: E704
 
 
-@overload
-def dumps(elm: "mpl.lines.Line2D") -> LineInfo:
-    ...
+@_t.overload
+def dumps(elm: "lines.Line2D") -> LineInfo: ...  # noqa: E704
 
 
 def dumps(elm):
     if isinstance(elm, plt.Axes):
         info = AxesInfo.dumps(elm)
-    elif isinstance(elm, plt.Figure):
+    elif isinstance(elm, Figure):
         info = FigureInfo.dumps(elm)
-    elif isinstance(elm, mpl.lines.Line2D):
+    elif isinstance(elm, lines.Line2D):
         info = LineInfo.dumps(elm)
-    elif isinstance(elm, mpl.legend.Legend):
+    elif isinstance(elm, legend.Legend):
         info = LegendInfo.dumps(elm)
-    elif isinstance(elm, mpl.collections.LineCollection):
+    elif isinstance(elm, collections.LineCollection):
         info = LineCollectionInfo.dumps(elm)
-    elif isinstance(elm, mpl.axis.XAxis):
-        info = XAxisInfo.dumps(elm)
-    elif isinstance(elm, mpl.axis.YAxis):
-        info = YAxisInfo.dumps(elm)
-    elif isinstance(elm, mpl.text.Annotation):
+    # elif isinstance(elm, mpl.axis.XAxis):
+    #     info = XAxisInfo.dumps(elm)
+    # elif isinstance(elm, mpl.axis.YAxis):
+    # info = YAxisInfo.dumps(elm)
+    elif isinstance(elm, text.Annotation):
         info = AnnotationInfo.dumps(elm)
+    elif isinstance(elm, image.AxesImage):
+        info = AxesImageInfo.dumps(elm)
     else:
         return None
 
@@ -70,6 +81,8 @@ def load_axes(ax: plt.Axes, info: AxesInfo):
     for child in info.children:
         child.load_to(ax)
 
+    return info
+
 
 def load_fig(fig, info: FigureInfo):
     for child in info.children:
@@ -81,20 +94,63 @@ def load_fig(fig, info: FigureInfo):
         if child.__class__.__name__ == "LegendInfo":
             fig.legend(loc=child.loc)
 
+    return info
 
-def load(obj, info) -> None:
+
+def load(obj, info):
     if isinstance(info, str):
-        info = FigureInfo.from_json(info)
+        info = info_from_str(info)
+
     if isinstance(info, dict):
         info = FigureInfo.from_dict(info)
 
-    if info.__class__.__name__ == "FigureInfo":
-        return load_fig(obj, info)
-    if info.__class__.__name__ == "AxesInfo":
-        return load_axes(obj, info)
+    info.load_to(obj)
+
+    # if isinstance(info, FigureInfo): # info.__class__.__name__ == "FigureInfo"
+    #     return load_fig(obj, info)
+    # if isinstance(info, AxesInfo): # info.__class__.__name__ == "AxesInfo"
+    #     return load_axes(obj, info)
+    return info
 
 
-def loads(info) -> "plt.Figure":
-    fig = plt.figure()
-    load(fig, info)
-    return fig
+def loads(code: _t.Union[str, dict, ArtistInfo]) -> "Artist":
+    if isinstance(code, str):
+        info = info_from_str(code)
+    elif isinstance(code, dict):
+        class_itself = get_class_by_short_name(code["__name__"])
+        info = class_itself.from_dict(code)
+    else:
+        info = code
+
+    return info.loads()
+
+
+def loads_fig(code: _t.Union[str, dict, ArtistInfo]) -> "Figure":
+    return loads(code)  # type: ignore
+
+
+def loads_ax(code: _t.Union[str, dict, ArtistInfo]) -> "plt.Axes":
+    return loads(code)  # type: ignore
+
+
+# _T = _t.TypeVar("_T", bound=Artist)
+
+
+# class LoadedResult(_t.Generic[_T], _t.NamedTuple):
+#     obj: _T
+#     info: ArtistInfo
+
+
+def info_from_str(code: str):
+    if code.startswith("{"):
+        data = json.loads(code, cls=json_coders.NumbersDecoder)
+    else:
+        data = decode_dict(code)
+
+    class_itself = get_class_by_short_name(data["__name__"])
+    return class_itself.from_dict(data)
+
+
+def get_class_by_short_name(name: str) -> _t.Type[ArtistInfo]:
+    class_name = SHORT_NAMES_OF_CLASSES_INVERSE[name]
+    return NAMES_OF_CLASSES[class_name]

@@ -13,18 +13,20 @@ class StringEncoder(json.JSONEncoder):
 class NumbersDecoder(json.JSONDecoder):
     """Decode float and int."""
 
-    def decode(self, s):  # pylint: disable=W0221
+    def decode(self, s):  # pylint: disable=W0221 # type: ignore
         result = super().decode(s)
         return self._decode(result)
 
     def _decode(self, obj):
         if isinstance(obj, str):
             try:
-                obj_check = obj[1:] if obj.startswith('-') else obj
+                obj_check = obj[1:] if obj.startswith("-") else obj
                 if obj_check.isnumeric():
                     return int(obj)
-                if obj_check.count('.') == 1 and \
-                        obj_check.replace('.', '').isnumeric():
+                if (
+                    obj_check.count(".") == 1
+                    and obj_check.replace(".", "").replace("-", "").replace("e", "").isnumeric()
+                ):
                     return float(obj)
                 return obj
             except ValueError:

@@ -1,10 +1,13 @@
-import unittest
 import os
 import shutil
-import numpy as np
+import unittest
+
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.figure import Figure
 
 import pltsave
+
 from .compare_images import images_are_similar
 
 TEST_DIR = os.path.dirname(__file__)
@@ -23,21 +26,21 @@ class BaseTest(unittest.TestCase):
         os.makedirs(DATA_DIR, exist_ok=True)
         self.file_prefix = self.__class__.__name__
 
-    def assertConversionRight(self, fig: "plt.Figure"):
+    def assertConversionRight(self, fig: "Figure"):
         info = pltsave.dumps(fig)
         fig2 = pltsave.loads(info)
         self.assertFigEqual(fig, fig2)
 
-    def assertFigEqual(self, fig1: "plt.Figure", fig2: "plt.Figure"):
+    def assertFigEqual(self, fig1: "Figure", fig2: "Figure"):
         self._assertFigEqual(fig1, fig2, True)
 
-    def assertFigNotEqual(self, fig1: "plt.Figure", fig2: "plt.Figure"):
+    def assertFigNotEqual(self, fig1: "Figure", fig2: "Figure"):
         self._assertFigEqual(fig1, fig2, False)
 
     def _assertFigEqual(
         self,
-        fig1: "plt.Figure",
-        fig2: "plt.Figure",
+        fig1: "Figure",
+        fig2: "Figure",
         assert_to: bool,
     ):
         path1 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png")

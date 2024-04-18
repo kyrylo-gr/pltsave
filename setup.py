@@ -1,4 +1,5 @@
 """Import pltsave."""
+
 import setuptools
 
 NAME = "pltsave"
@@ -7,11 +8,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 
-def get_version():
-    with open(f"{NAME}/__config__.py", "r", encoding="utf-8") as fh:
-        for line in fh.readlines():
+def get_version() -> str:
+    with open(f"{NAME}/__config__.py", "r", encoding="utf-8") as file:
+        for line in file.readlines():
             if line.startswith("__version__"):
                 return line.split("=")[1].strip().strip('"').strip("'")
+    raise ValueError("Version not found")
 
 
 setuptools.setup(
