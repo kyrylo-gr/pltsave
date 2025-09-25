@@ -5,12 +5,13 @@ from typing import Dict, List, Literal, Optional, Type, Union
 import numpy as np
 from matplotlib import axes, axis, collections, figure, image, legend, lines
 from matplotlib import text as mtext
-from matplotlib.artist import Artist
 
 from . import json_coders
 from .aliases import SHORT_NAMES_OF_CLASSES, SHORT_NAMES_OF_CLASSES_INVERSE
 from .compress.routines import decode_dict, encode_dict
 from .defaults import DEFAULT_COLORS, DEFAULT_COLORS_REVERSE, DEFAULT_VALUES
+
+# from matplotlib.artist import Artist
 
 
 def dict_filter_non_none(d: dict, keys: Optional[List[str]] = None) -> dict:
@@ -70,7 +71,7 @@ class ArtistInfo:
         return self._children
 
     @property
-    def transformation(self) -> "TransformationInfo":
+    def transformation(self) -> "Optional[TransformationInfo]":
         return self._transformation
 
     @transformation.setter
@@ -105,7 +106,7 @@ class ArtistInfo:
     def to_url(self, title: Optional[str] = None):
         if title:
             return f"[{title}]({self.to_url()})"
-        return f"//papir.app/plot?d={self.to_compresed_str()}"
+        return f"//papir.app/pl?t={self.to_compresed_str()}"
 
     @classmethod
     def from_json(cls, s):
@@ -161,20 +162,30 @@ class TransformationInfo(ArtistInfo):
     @staticmethod
     def dumps_from_obj(elm: lines.Line2D):
         if hasattr(elm, "_axes"):
-            if elm.get_transform() is elm._axes.get_xaxis_transform(  # pylint: disable=W0212
-                which="grid"
+            if (
+                elm.get_transform()
+                is elm._axes.get_xaxis_transform(  # pylint: disable=W0212 # type: ignore
+                    which="grid"
+                )
             ):
                 return TransformationInfo(which="x_grid")
-            if elm.get_transform() is elm._axes.get_yaxis_transform(  # pylint: disable=W0212
-                which="grid"
+            if (
+                elm.get_transform()
+                is elm._axes.get_yaxis_transform(  # pylint: disable=W0212 # type: ignore
+                    which="grid"
+                )
             ):
                 return TransformationInfo(which="y_grid")
 
     def load_to(self, elm: Union[lines.Line2D, collections.LineCollection], /):
         if self.which == "x_grid":
-            elm.set_transform(elm._axes.get_xaxis_transform(which="grid"))  # pylint: disable=W0212
+            elm.set_transform(
+                elm._axes.get_xaxis_transform(which="grid")  # pylint: disable=W0212 # type: ignore
+            )  # pylint: disable=W0212 # type: ignore
         if self.which == "y_grid":
-            elm.set_transform(elm._axes.get_yaxis_transform(which="grid"))  # pylint: disable=W0212
+            elm.set_transform(
+                elm._axes.get_yaxis_transform(which="grid")  # pylint: disable=W0212 # type: ignore
+            )  # pylint: disable=W0212 # type: ignore
 
 
 @dataclass

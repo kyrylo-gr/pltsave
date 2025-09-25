@@ -1,7 +1,10 @@
+from typing import Optional
+
 import numpy as np
 
-from ..aliases import KEY_ALIASES_MAP, TEXT_FORBIDDEN_SYMBOLS
+from ..aliases import KEY_ALIASES_MAP  # , TEXT_FORBIDDEN_SYMBOLS
 from .compress_numbers import compress_array, compress_number
+from .encode_data_funcs import stringify_elm
 
 
 def normalize_elm(data):
@@ -31,33 +34,35 @@ def compress_key(key):
     return KEY_ALIASES_MAP.get(key, key)
 
 
-def compress_elm(data):
+def compress_elm(data, precision=3) -> Optional[str]:
     if not isinstance(data, (int, float)) and not data:
         return None
     if isinstance(data, dict):
-        return compress_dict(data)
+        return stringify_elm(compress_dict(data))
     if isinstance(data, (int, float)):
         if isinstance(data, int) and 0 <= data < 10:
             return str(data)
-        return "z" + compress_number(data)
+        return "@" + compress_number(data)
 
     if hasattr(data, "__iter__") and not isinstance(data, (str, bytes)):
         if isinstance(data[0], (int, float)):
-            precision_shift = 3
-            precision_code = chr(97 + precision_shift)
-            return precision_code + compress_array(data, precision=0, precision_shift=3)
-        return [compress_elm(elm) for elm in data]
+            precision_shift = precision
+            precision_code = f"+{precision_shift}"  # chr(97 + precision_shift)
+            return precision_code + compress_array(
+                data, precision=0, precision_shift=precision_shift
+            )
+        return stringify_elm([compress_elm(elm) for elm in data])
 
     if isinstance(data, str) and data[0] == "#":
         number = int(data[1:], 16)
-        return "x" + compress_number(number)
+        return "$" + compress_number(number)
 
-    if isinstance(data, str) and any(s in data for s in TEXT_FORBIDDEN_SYMBOLS):
+    if isinstance(data, str):  # and any(s in data for s in TEXT_FORBIDDEN_SYMBOLS):
         return f"({data})"
 
-    if isinstance(data, str) and 96 < ord(data[0]) < 123:
-        return "_" + data
-    return data
+    # if isinstance(data, str) and 96 < ord(data[0]) < 123:
+    #     return "_" + data
+    return stringify_elm(data)
 
 
 def compress_dict(data: dict):

@@ -1,14 +1,18 @@
-from .compress_dict import compress_dict, normalize_dict
+from .compress_dict import compress_elm, normalize_dict
 from .decode_data_funcs import decode_elm
-from .encode_data_funcs import stringify_elm
+
+# from .encode_data_funcs import stringify_elm
 
 ALGO_VERSION = 1
 
 
 def encode_dict(data: dict):
     data = normalize_dict(data)
-    data = compress_dict(data)
-    return f"v{ALGO_VERSION}" + stringify_elm(data)
+    # data = compress_dict(data)
+    data_str = compress_elm(data)
+    if not data_str:
+        return ""
+    return f"v{ALGO_VERSION}" + data_str
 
 
 def decode_dict(code: str) -> dict:

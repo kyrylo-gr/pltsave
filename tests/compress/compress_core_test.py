@@ -36,15 +36,54 @@ class CompressNumbersTest(unittest.TestCase):
 
 
 class CompressArrayTest(unittest.TestCase):
+    def compress_and_compare(self, array):
+        compressed = compress.compress_array(array)
+        decompressed = compress.decompress_array(compressed)
+        self.assertEqual(len(array), len(decompressed))
+        for i, j in zip(array, decompressed):
+            self.assertAlmostEqual(i, j, places=3)
+
     def test_array(self):
         array: List[float] = list(range(1000))
-        compressed = compress.compress_array(array)
+        self.compress_and_compare(array)
 
-        decompressed = compress.decompress_array(compressed)
-        self.assertEqual(array, decompressed)
+    def test_float(self):
+        array: List[float] = [i / 100 for i in range(1000)]
+        self.compress_and_compare(array)
 
     def test_big_array(self):
         array: List[float] = list(range(int(1e4), int(1e8), 957))
-        compressed = compress.compress_array(array)
-        decompressed = compress.decompress_array(compressed)
-        self.assertEqual(array, decompressed)
+        self.compress_and_compare(array)
+
+
+class CompressDifferentTypesTest(unittest.TestCase):
+    def compress_and_compare(self, val):
+        compressed = str(compress.compress_elm(val))
+        decompressed = compress.decode_elm(compressed)
+        self.assertEqual(
+            val, decompressed, msg=f"val={val}, compressed={compressed} decompressed={decompressed}"
+        )
+
+    def test_int(self):
+        self.compress_and_compare(123)
+
+    def test_float(self):
+        self.compress_and_compare(123.456)
+
+    def test_string(self):
+        self.compress_and_compare("hello")
+
+    def test_hex(self):
+        self.compress_and_compare("#1234")
+
+    def test_array(self):
+        self.compress_and_compare([1, 2, 3, 4])
+
+    def test_array_float(self):
+        self.compress_and_compare([1.1, 2.2, 3.3, 4.4])
+
+    def test_dict(self):
+        self.compress_and_compare({"aaa": 1, "bb": 2, "ccc": 3})
+
+    def test_nested_dict(self):
+        self.compress_and_compare({"a": 1, "b": {"c": 2, "d": 3}})

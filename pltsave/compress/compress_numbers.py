@@ -1,8 +1,10 @@
 import typing as _t
+from math import log2
 
-from .encoding_maps import DECODING_MAP, ENCODING_MAP
+# from .encoding_maps import DECODING_MAP, ENCODING_MAP
+from .encoding_maps_v1 import DECODING_MAP, ENCODING_MAP
 
-BASE = 16
+BASE = min(16, int(log2(len(ENCODING_MAP))))
 BASE_MAX = (1 << BASE) - 1
 
 DEFAULT_PRECISION = 3
@@ -147,7 +149,7 @@ def decompress_elm_in_array(
         elm, index_shift, _ = decompress_elm_in_array(code, index + 2)
         return elm, index_shift + 2, reps
 
-    if 48 < ord(first_symbol) < 58:
+    if 48 < ord(first_symbol) < 58:  # 48 is "0", 57 is "9"
         length = int(first_symbol)
         return decompress_number(code[index + 1 : index + length + 1]), length + 1, 1
 

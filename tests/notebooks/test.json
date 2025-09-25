@@ -1,0 +1,31 @@
+{
+  "children": [
+    {
+      "xlim": [-0.05, 1.05],
+      "ylim": [1.95, 3.05],
+      "rect": [0.125, 0.10999999999999999, 0.775, 0.77],
+      "xlabel": "",
+      "ylabel": "",
+      "title": "",
+      "children": [
+        {
+          "xdata": ["0", "1"],
+          "ydata": ["3", "2"],
+          "color": "#1f77b4",
+          "ls": "-",
+          "lw": 1.5,
+          "ds": "default",
+          "marker": "None",
+          "markerfacecolor": "#1f77b4",
+          "markeredgecolor": "#1f77b4",
+          "label": "fit",
+          "zorder": 2,
+          "children": [],
+          "__name__": "LineInfo"
+        }
+      ],
+      "__name__": "AxesInfo"
+    }
+  ],
+  "__name__": "FigureInfo"
+}

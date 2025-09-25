@@ -1,8 +1,6 @@
 import json
 import typing as _t
-from uu import decode
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import collections, image, legend, lines, text
 from matplotlib.artist import Artist
@@ -11,7 +9,7 @@ from matplotlib.figure import Figure
 from . import json_coders
 from .aliases import SHORT_NAMES_OF_CLASSES_INVERSE
 from .compress.routines import decode_dict
-from .stuctures import (
+from .stuctures import (  # XAxisInfo,; YAxisInfo,
     NAMES_OF_CLASSES,
     AnnotationInfo,
     ArtistInfo,
@@ -22,8 +20,6 @@ from .stuctures import (
     LineCollectionInfo,
     LineInfo,
     TransformationInfo,
-    XAxisInfo,
-    YAxisInfo,
 )
 
 
@@ -65,14 +61,14 @@ def dumps(elm):
         return None
 
     for child in elm.get_children():
-        child_info = dumps(child)
+        child_info = dumps(child)  # type: ignore
         if child_info:
             info.children.append(child_info)
 
     transformation = elm.get_transform()
 
     if transformation:
-        info.transformation = TransformationInfo.dumps_from_obj(elm)
+        info.transformation = TransformationInfo.dumps_from_obj(elm)  # type: ignore
 
     return info
 
@@ -89,10 +85,10 @@ def load_fig(fig, info: FigureInfo):
         # getattr(obj, child._func)(child._elm(**child.dict()))
         if child.__class__.__name__ == "AxesInfo":
             ax = plt.Axes(fig, **child.params())
-            load_axes(ax, child)
+            load_axes(ax, child)  # type: ignore
             fig.add_axes(ax)
         if child.__class__.__name__ == "LegendInfo":
-            fig.legend(loc=child.loc)
+            fig.legend(loc=child.loc)  # type: ignore
 
     return info
 

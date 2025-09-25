@@ -33,15 +33,15 @@ def decode_elm(data: str):
         return decode_array(data)
     if data[0] == "(":
         return data[1:-1]
-    if data[0] == "z":
+    if data[0] == "@":
         return decompress_number(data[1:])
     if data[0] == "_":
         return data[1:]
-    if data[0] in {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}:
-        precision_shift = ord(data[0]) - 97
+    if data[0] == "+":
+        precision_shift = int(data[1])  # ord(data[0]) - 97
         # print(data[1:])
-        return decompress_array(data[1:], precision_shift=precision_shift)
-    if data[0] == "x":
+        return decompress_array(data[2:], precision_shift=precision_shift)
+    if data[0] == "$":
         return "#" + hex(decompress_int(data[1:]))[2:]
 
     if data.replace(".", "").isnumeric():
