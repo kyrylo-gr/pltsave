@@ -1,6 +1,7 @@
 from typing import Optional
 
 import numpy as np
+import numpy.typing as npt
 
 from ..aliases import KEY_ALIASES_MAP  # , TEXT_FORBIDDEN_SYMBOLS
 from .compress_numbers import compress_array, compress_number
@@ -16,9 +17,9 @@ def normalize_elm(data):
         if "." in data:
             return float(data)
         return int(data)
-    if isinstance(data, np.int_):  # type: ignore
+    if isinstance(data, np.floating):  # type: ignore
         return int(data)
-    if isinstance(data, np.float_):  # type: ignore
+    if isinstance(data, np.floating):  # type: ignore
         return float(data)
     if hasattr(data, "__iter__") and not isinstance(data, (str, bytes)):
         return [normalize_elm(elm) for elm in data]

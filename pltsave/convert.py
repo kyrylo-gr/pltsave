@@ -2,85 +2,88 @@ import json
 import typing as _t
 
 import matplotlib.pyplot as plt
-from matplotlib import collections, image, legend, lines, text
+from matplotlib import collections, container, image, legend, lines, patches, text
 from matplotlib.artist import Artist
 from matplotlib.figure import Figure
 
 from . import json_coders
 from .aliases import SHORT_NAMES_OF_CLASSES_INVERSE
 from .compress.routines import decode_dict
-from .stuctures import (  # XAxisInfo,; YAxisInfo,
-    NAMES_OF_CLASSES,
-    AnnotationInfo,
-    ArtistInfo,
-    AxesImageInfo,
-    AxesInfo,
-    FigureInfo,
-    LegendInfo,
-    LineCollectionInfo,
-    LineInfo,
-    TransformationInfo,
-)
+from . import stuctures
+# from .stuctures import (  # XAxisInfo,; YAxisInfo,
+#     NAMES_OF_CLASSES,
+#     AnnotationInfo,
+#     ArtistInfo,
+#     AxesImageInfo,
+#     AxesInfo,
+#     FigureInfo,
+#     LegendInfo,
+#     LineCollectionInfo,
+#     LineInfo,
+#     ScatterInfo,
+#     TextInfo,
+#     TransformationInfo,
+# )
 
 
 @_t.overload
-def dumps(elm: "Figure") -> FigureInfo: ...  # noqa: E704
+def dumps(elm: "Figure") -> stuctures.FigureInfo: ...  # noqa: E704
 
 
 @_t.overload
-def dumps(elm: "plt.Axes") -> AxesInfo: ...  # noqa: E704
+def dumps(elm: "plt.Axes") -> stuctures.AxesInfo: ...  # noqa: E704
 
 
 @_t.overload
-def dumps(elm: "lines.Line2D") -> LineInfo: ...  # noqa: E704
+def dumps(elm: "lines.Line2D") -> stuctures.LineInfo: ...  # noqa: E704
 
 
 def dumps(elm):
     if isinstance(elm, plt.Axes):
-        info = AxesInfo.dumps(elm)
+        info = stuctures.AxesInfo.dumps(elm, dumps)
     elif isinstance(elm, Figure):
-        info = FigureInfo.dumps(elm)
+        info = stuctures.FigureInfo.dumps(elm, dumps)
     elif isinstance(elm, lines.Line2D):
-        info = LineInfo.dumps(elm)
+        info = stuctures.LineInfo.dumps(elm, dumps)
+    elif isinstance(elm, collections.PathCollection):
+        info = stuctures.ScatterInfo.dumps(elm, dumps)
     elif isinstance(elm, legend.Legend):
-        info = LegendInfo.dumps(elm)
+        info = stuctures.LegendInfo.dumps(elm, dumps)
     elif isinstance(elm, collections.LineCollection):
-        info = LineCollectionInfo.dumps(elm)
+        info = stuctures.LineCollectionInfo.dumps(elm, dumps)
+    elif isinstance(elm, text.Annotation):
+        info = stuctures.AnnotationInfo.dumps(elm, dumps)
+    elif isinstance(elm, text.Text):
+        info = stuctures.TextInfo.dumps(elm, dumps)
+    elif isinstance(elm, container.BarContainer):
+        info = stuctures.BarInfo.dumps(elm, dumps)
+    elif isinstance(elm, patches.Rectangle):
+        info = stuctures.RectangleInfo.dumps(elm, dumps)
+
     # elif isinstance(elm, mpl.axis.XAxis):
     #     info = XAxisInfo.dumps(elm)
     # elif isinstance(elm, mpl.axis.YAxis):
     # info = YAxisInfo.dumps(elm)
-    elif isinstance(elm, text.Annotation):
-        info = AnnotationInfo.dumps(elm)
+
     elif isinstance(elm, image.AxesImage):
-        info = AxesImageInfo.dumps(elm)
+        info = stuctures.AxesImageInfo.dumps(elm, dumps)
     else:
         return None
 
     if info is None:
         return None
 
-    for child in elm.get_children():
-        child_info = dumps(child)  # type: ignore
-        if child_info:
-            info.children.append(child_info)
-
-    transformation = elm.get_transform()
-
-    if transformation:
-        info.transformation = TransformationInfo.dumps_from_obj(elm)  # type: ignore
-
     return info
 
 
-def load_axes(ax: plt.Axes, info: AxesInfo):
+def load_axes(ax: plt.Axes, info: stuctures.AxesInfo):
     for child in info.children:
         child.load_to(ax)
 
     return info
 
 
-def load_fig(fig, info: FigureInfo):
+def load_fig(fig, info: stuctures.FigureInfo):
     for child in info.children:
         # getattr(obj, child._func)(child._elm(**child.dict()))
         if child.__class__.__name__ == "AxesInfo":
@@ -98,7 +101,7 @@ def load(obj, info):
         info = info_from_str(info)
 
     if isinstance(info, dict):
-        info = FigureInfo.from_dict(info)
+        info = stuctures.FigureInfo.from_dict(info)
 
     info.load_to(obj)
 
@@ -109,7 +112,7 @@ def load(obj, info):
     return info
 
 
-def loads(code: _t.Union[str, dict, ArtistInfo]) -> "Artist":
+def loads(code: _t.Union[str, dict, stuctures.ArtistInfo]) -> "Artist":
     if isinstance(code, str):
         info = info_from_str(code)
     elif isinstance(code, dict):
@@ -121,11 +124,11 @@ def loads(code: _t.Union[str, dict, ArtistInfo]) -> "Artist":
     return info.loads()
 
 
-def loads_fig(code: _t.Union[str, dict, ArtistInfo]) -> "Figure":
+def loads_fig(code: _t.Union[str, dict, stuctures.ArtistInfo]) -> "Figure":
     return loads(code)  # type: ignore
 
 
-def loads_ax(code: _t.Union[str, dict, ArtistInfo]) -> "plt.Axes":
+def loads_ax(code: _t.Union[str, dict, stuctures.ArtistInfo]) -> "plt.Axes":
     return loads(code)  # type: ignore
 
 
@@ -147,6 +150,6 @@ def info_from_str(code: str):
     return class_itself.from_dict(data)
 
 
-def get_class_by_short_name(name: str) -> _t.Type[ArtistInfo]:
+def get_class_by_short_name(name: str) -> _t.Type[stuctures.ArtistInfo]:
     class_name = SHORT_NAMES_OF_CLASSES_INVERSE[name]
-    return NAMES_OF_CLASSES[class_name]
+    return stuctures.NAMES_OF_CLASSES[class_name]

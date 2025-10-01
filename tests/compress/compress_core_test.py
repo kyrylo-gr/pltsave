@@ -27,11 +27,15 @@ class CompressNumbersTest(unittest.TestCase):
         for i in range(int(1e4), int(1e8), 997):
             number = i / 1000
             result = round(
-                compress.decompress_number(compress.compress_number(number, precision=precision)),
+                compress.decompress_number(
+                    compress.compress_number(number, precision=precision)
+                ),
                 precision,
             )
             self.assertEqual(
-                round(number, precision), result, msg=f"number={number}, result={result}"
+                round(number, precision),
+                result,
+                msg=f"number={number}, result={result}",
             )
 
 
@@ -61,7 +65,9 @@ class CompressDifferentTypesTest(unittest.TestCase):
         compressed = str(compress.compress_elm(val))
         decompressed = compress.decode_elm(compressed)
         self.assertEqual(
-            val, decompressed, msg=f"val={val}, compressed={compressed} decompressed={decompressed}"
+            val,
+            decompressed,
+            msg=f"val={val}, compressed={compressed} decompressed={decompressed}",
         )
 
     def test_int(self):
@@ -86,4 +92,4 @@ class CompressDifferentTypesTest(unittest.TestCase):
         self.compress_and_compare({"aaa": 1, "bb": 2, "ccc": 3})
 
     def test_nested_dict(self):
-        self.compress_and_compare({"a": 1, "b": {"c": 2, "d": 3}})
+        self.compress_and_compare({"a": 1, "b": {"color": 2, "d": 3}})

@@ -27,7 +27,16 @@ class BaseTest(unittest.TestCase):
         self.file_prefix = self.__class__.__name__
 
     def assertConversionRight(self, fig: "Figure"):
+        fig.draw_without_rendering()
         info = pltsave.dumps(fig)
+        with open(
+            os.path.join(
+                self.data_dir, f"{self.file_prefix}_{self._testMethodName}.txt"
+            ),
+            "w",
+        ) as f:
+            f.write(info.to_json())
+
         fig2 = pltsave.loads(info)
         self.assertFigEqual(fig, fig2)
 
@@ -43,10 +52,14 @@ class BaseTest(unittest.TestCase):
         fig2: "Figure",
         assert_to: bool,
     ):
-        path1 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png")
-        path2 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png")
-        fig1.savefig(path1)
-        fig2.savefig(path2)
+        path1 = os.path.join(
+            self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png"
+        )
+        path2 = os.path.join(
+            self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png"
+        )
+        fig1.savefig(path1, dpi=fig1.dpi)
+        fig2.savefig(path2, dpi=fig2.dpi)
 
         return self.assertImageEqual(path1, path2, assert_to)
 
@@ -65,12 +78,21 @@ class BaseTest(unittest.TestCase):
         self.tearDown()
 
     def tearDown(self):
-        path1 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png")
-        path2 = os.path.join(self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png")
+        path1 = os.path.join(
+            self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig1.png"
+        )
+        path2 = os.path.join(
+            self.data_dir, f"{self.file_prefix}_{self._testMethodName}_fig2.png"
+        )
+        path3 = os.path.join(
+            self.data_dir, f"{self.file_prefix}_{self._testMethodName}.txt"
+        )
         if os.path.exists(path1):
             os.remove(path1)
         if os.path.exists(path2):
             os.remove(path2)
+        if os.path.exists(path3):
+            os.remove(path3)
 
     @classmethod
     def tearDownClass(cls):
